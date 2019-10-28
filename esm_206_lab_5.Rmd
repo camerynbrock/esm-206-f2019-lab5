@@ -9,22 +9,87 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## Objectives: 
+- Getting counts for different groups
+- Use {lubridate} package to parse dates
+- Find confidence intervals & do t-tests with t.test()
+- Heatmap with geom_tile()
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+```{r, include = FALSE}
 
-```{r cars}
-summary(cars)
+# Attach packages
+
+library(tidyverse)
+library(here)
+library(janitor)
+
 ```
 
-## Including Plots
+```{r}
 
-You can also embed plots, for example:
+# Import lobster data
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+lobster_abundance <- read_csv(here::here("data", "lobster_abundance.csv"),
+                              na = "-99999") %>% 
+  clean_names()
+
+# Can view different sites with unique(lobster_abundance$SITE)
+# Raw data has data as a character, has -9999 instead of NA, columns are not in lower_case_snake_case, there is a column called "lobster_count" instead of there being a row for each observation. 
+# Check if it's TIDY - each observation should have its own row (not the case! this is a frequency table), each variable should have its own column
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Use the tidyr::uncount() function to expand a frequency table
+
+```{r}
+
+lobster_tidy <- lobster_abundance %>% 
+  tidyr::uncount(lobster_count)
+  
+# This drops ones where the counts = 0 
+
+```
+
+Now each lobster has its own rows. Yay!
+
+Let's look at this a couple different ways: 
+
+```{r}
+
+ggplot(lobster_tidy, aes(x = site,
+                         y = size_mm)) +
+  geom_jitter(aes(color = site),
+              width = 0.2,
+              alpha = 0.3,
+              show.legend = FALSE)
+
+ggplot(lobster_tidy, aes(x = site,
+                         y = size_mm)) +
+  geom_violin(aes(fill = site),
+              color = "white",
+              show.legend = FALSE)
+
+ggplot(lobster_tidy, aes(x = size_mm)) + 
+  geom_histogram(aes(fill = site)) + 
+  facet_wrap(~site, scales = "free") 
+
+
+# facet_wrap(~) - remember!
+# 'scales = "free"' means scales differ for each different facet, can be misleading if you're comparing across groups
+
+# Are these distributions normal? Let's check with a quantile-quantile plot!
+
+ggplot(lobster_tidy, aes(sample = size_mm)) + 
+  geom_qq(aes(color = site)) + 
+  facet_wrap(~site) 
+
+# Need to choose a sample to geom_qq to compare
+# geom_qq() has a default normal distribution built into it - the sample is what we are testing
+
+```
+
+
+
+
+
