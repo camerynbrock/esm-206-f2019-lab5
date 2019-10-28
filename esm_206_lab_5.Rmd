@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
 ```
 
 ## Objectives: 
@@ -81,13 +81,189 @@ ggplot(lobster_tidy, aes(x = size_mm)) +
 # Are these distributions normal? Let's check with a quantile-quantile plot!
 
 ggplot(lobster_tidy, aes(sample = size_mm)) + 
-  geom_qq(aes(color = site)) + 
+  geom_qq(aes(color = site),
+          show.legend = FALSE) + 
   facet_wrap(~site) 
 
 # Need to choose a sample to geom_qq to compare
 # geom_qq() has a default normal distribution built into it - the sample is what we are testing
 
 ```
+
+Use 'lubridate' package to parse dates and times
+
+- We tend to specify package ("lubridate::") because these names are generic and tend to exist in other packages
+- Check class of data with 'class(lobster_tidy$date)' in console 
+- I'm going to add a new column with 'mutate()' that contains my date as an actual date
+- This will also change the class to date
+
+```{r}
+
+lobster_date <- lobster_tidy %>% 
+  mutate(date_new = lubridate::mdy(date))
+
+```
+
+Parse 'date' column to get the different pieces (month, year) separated
+
+```{r}
+
+lobster_parse_date <- lobster_date %>% 
+  mutate(
+    obs_month = lubridate::month(date_new, 
+                                 label = TRUE),
+    obs_year = lubridate::year(date_new)
+    )
+
+# label = TRUE gives us month name instead of number!  
+# This also makes it already factored with levels of all the months
+# Can check with class() & see it's an ordered factor, then can check with levels() to see all the levels (months) of the factor
+      
+```
+
+Count lobsters by different groupings... 
+
+- Can use **count()** 
+- says group_by, then summarise, then find the length, then ungroups. 
+- is awesome if we have categorical data
+
+Let's say I want to count the number of lobsters by year and month
+
+
+```{r}
+
+lobster_ym <- lobster_parse_date %>% 
+  count(obs_year, obs_month)
+
+# Titles up total observations that exist
+
+lobster_ym
+
+lobster_ysite <- lobster_parse_date %>% 
+  count(obs_year, site)
+
+lobster_ysite
+
+lobster_site <- lobster_parse_date %>% 
+  count(site)
+
+lobster_site
+
+```
+
+Key has more examples for functions to use to make tables for more than just count
+- group_by + summarize + n()
+
+```{r}
+
+lobster_summary <- lobster_parse_date %>% 
+  group_by(site) %>% 
+  summarize(
+    mean_size = mean(size_mm,
+                     na.rm = TRUE),
+    sd_size = sd(size_mm, 
+                 na.rm = TRUE),
+    sample_n = n()
+  )
+
+# Not responsible to just give the mean of data without also giving the standard deviation and the sample size
+
+# There is also tally(), but count is a combination between group_by() & tally() 
+
+```
+
+Confidence intervals and t-tests
+
+t distribution is what you'll use if you don't know the population variance, accounts for uncertainty that comes with not knowing that
+
+**One-sample t-test**
+
+Use the "t.test()" function to find confidence intervals and perform t-tests
+
+```{r}
+
+ivee_lobsters <- lobster_tidy %>% 
+  filter(site == "IVEE") %>% 
+  pull(size_mm)
+
+# this creates a vector with the lobster size values
+# Now we can use the t.test() on a vector - will calculate one-sample t-test and confidence intervals
+# Deduces what you want to do based on how many vectors you give it
+
+t.test(ivee_lobsters)
+
+```
+
+**Confidence Interval** 
+
+If we took a bunch of samples and got the means for all of them - I would expect the sample mean to fall within this range (72.99-74.16) 95% of the time 
+- This does not mean "there is a 95% chance the mean is in this range" 
+- It's in 95% of other samples I take - based on sampling distribution, not on the data
+
+**Two-sample t-test**
+
+Is there a significant difference between lobsters measured at Naples Reef and those measures at Mohawk reef? 
+
+```{r}
+
+napl_sample <- lobster_tidy %>% 
+  filter(site == "NAPL") %>% 
+  pull(size_mm)
+
+mohk_sample <- lobster_tidy %>% 
+  filter(site == "MOHK") %>% 
+  pull(size_mm)
+
+mohk_napl_ttest <- t.test(napl_sample, 
+                          mohk_sample)
+
+mohk_napl_ttest
+
+```
+
+**p-value** here tells us there is only a 2.2*10^-16 probability that we could've taken two samples from a population with the same mean and received the means that are this different, so, the more likely explanation is that they were drawn from populations with different means
+
+Answers "did it happen from random chance?" PROBABLY NOT
+
+Actual sentence we would put in our actual report: 
+
+*Mean lobster size differed significantly between Mohawk and Naples Reefs (t(`r mohk_napl_ttest$parameter`) = `r mohk_napl_ttest$statistic`).*
+
+- Note: we may typically write "(t(1850.8) = 19.849)", but doing this allows room for error in writing or copying and pasting - so we call these value with `r`
+- Can see what terms to use in ?t.test > values (i.e. how we know degrees of freedom can be referenced with "parameter")
+
+Maybe an easier way to do a two-value t-test... 
+
+```{r}
+
+lobster_2sample <- lobster_tidy %>% 
+  filter(site %in% c("NAPL", "MOHK"))
+
+ttest_2 <- t.test(size_mm ~ site, 
+                  data = lobster_2sample)
+
+ttest_2
+
+# get same answers as we did the first way. The first and second group are switched (so signs are reversed), but this doesn't matter. 
+# only works for two groups, if there are more it will just choose first two groups
+
+```
+
+Make a **geom_tile heatmap**
+
+- Good to use if we have three variables we want to show
+
+```{r}
+
+ggplot(lobster_ysite, aes(x = obs_year,
+                          y = site)) +
+  geom_tile(aes(fill = n))
+
+```
+
+
+
+
 
 
 
